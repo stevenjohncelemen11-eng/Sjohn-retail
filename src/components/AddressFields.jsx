@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react';
+const BASE = 'https://psgc.gitlab.io/api';
+async function getJson(path) { const r = await fetch(`${BASE}/${path}`); if (!r.ok) throw new Error('Could not load Philippine address list. Check your connection and try again.'); return r.json(); }
+export default function AddressFields({ value, onChange }) {
+  const [regions,setRegions]=useState([]),[provinces,setProvinces]=useState([]),[cities,setCities]=useState([]),[barangays,setBarangays]=useState([]),[error,setError]=useState('');
+  useEffect(()=>{getJson('regions/').then(setRegions).catch(e=>setError(e.message));},[]);
+  useEffect(()=>{if(value.regionCode){getJson(`regions/${value.regionCode}/provinces/`).then(setProvinces).catch(()=>setProvinces([]));}else setProvinces([]);},[value.regionCode]);
+  useEffect(()=>{if(value.provinceCode && value.provinceCode!=='NCR'){getJson(`provinces/${value.provinceCode}/cities-municipalities/`).then(setCities).catch(()=>setCities([]));}else if(value.regionCode){getJson(`regions/${value.regionCode}/cities-municipalities/`).then(setCities).catch(()=>setCities([]));}else setCities([]);},[value.provinceCode,value.regionCode]);
+  useEffect(()=>{if(value.cityCode)getJson(`cities-municipalities/${value.cityCode}/barangays/`).then(setBarangays).catch(()=>setBarangays([]));else setBarangays([]);},[value.cityCode]);
+  const update=(patch)=>onChange({...value,...patch});
+  const select=(label,field,codeField,items,disabled,reset)=> {const ncr=field==='province'&&value.regionCode==='130000000';return <label className="field"><span>{label} *</span><select required disabled={disabled&&!ncr} value={value[codeField]||''} onChange={e=>{const code=e.target.value;const item=items.find(x=>x.code===code);update({[field]:code==='NCR'?'Metro Manila':(item?.name||''),[codeField]:code,...reset});}}><option value="">Select {label}</option>{ncr&&<option value="NCR">Metro Manila (NCR)</option>}{items.map(x=><option key={x.code} value={x.code}>{x.name}</option>)}</select></label>;};
+  return <div className="space-y-3"><div className="grid sm:grid-cols-2 gap-3">{select('Region','region','regionCode',regions,false,{province:'',provinceCode:'',city_municipality:'',cityCode:'',barangay:'',barangayCode:''})}{select('Province','province','provinceCode',provinces,!value.regionCode||provinces.length===0,{city_municipality:'',cityCode:'',barangay:'',barangayCode:''})}{select('City / Municipality','city_municipality','cityCode',cities,!value.regionCode||cities.length===0,{barangay:'',barangayCode:''})}{select('Barangay','barangay','barangayCode',barangays,!value.cityCode||barangays.length===0,{})}</div>{error&&<p className="text-xs text-red-400">{error} Address dropdowns require an internet connection.</p>}</div>;
+}
